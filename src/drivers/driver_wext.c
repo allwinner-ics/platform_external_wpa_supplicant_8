@@ -37,6 +37,8 @@
 #include "driver.h"
 #include "driver_wext.h"
 
+#include "config.h"
+#include "wpa_supplicant_i.h"
 
 static int wpa_driver_wext_flush_pmkid(void *priv);
 static int wpa_driver_wext_get_range(void *priv);
@@ -44,11 +46,11 @@ static int wpa_driver_wext_finish_drv_init(struct wpa_driver_wext_data *drv);
 static void wpa_driver_wext_disconnect(struct wpa_driver_wext_data *drv);
 static int wpa_driver_wext_set_auth_alg(void *priv, int auth_alg);
 #ifdef ANDROID
-extern int wpa_driver_wext_driver_cmd(void *priv, char *cmd, char *buf,
+static int wpa_driver_wext_driver_cmd(void *priv, char *cmd, char *buf,
 					size_t buf_len);
-extern int wpa_driver_wext_combo_scan(void *priv,
+static int wpa_driver_wext_combo_scan(void *priv,
 					struct wpa_driver_scan_params *params);
-extern int wpa_driver_signal_poll(void *priv, struct wpa_signal_info *si);
+static int wpa_driver_signal_poll(void *priv, struct wpa_signal_info *si);
 #endif
 
 int wpa_driver_wext_set_auth_param(struct wpa_driver_wext_data *drv,
@@ -91,7 +93,7 @@ int wpa_driver_wext_get_bssid(void *priv, u8 *bssid)
 	os_strlcpy(iwr.ifr_name, drv->ifname, IFNAMSIZ);
 
 	if (ioctl(drv->ioctl_sock, SIOCGIWAP, &iwr) < 0) {
-		perror("ioctl[SIOCGIWAP]");
+		wpa_printf(MSG_ERROR, "ioctl[SIOCGIWAP]");
 		ret = -1;
 	}
 	os_memcpy(bssid, iwr.u.ap_addr.sa_data, ETH_ALEN);
@@ -121,7 +123,7 @@ int wpa_driver_wext_set_bssid(void *priv, const u8 *bssid)
 		os_memset(iwr.u.ap_addr.sa_data, 0, ETH_ALEN);
 
 	if (ioctl(drv->ioctl_sock, SIOCSIWAP, &iwr) < 0) {
-		perror("ioctl[SIOCSIWAP]");
+		wpa_printf(MSG_ERROR, "ioctl[SIOCSIWAP]");
 		ret = -1;
 	}
 
@@ -147,7 +149,7 @@ int wpa_driver_wext_get_ssid(void *priv, u8 *ssid)
 	iwr.u.essid.length = 32;
 
 	if (ioctl(drv->ioctl_sock, SIOCGIWESSID, &iwr) < 0) {
-		perror("ioctl[SIOCGIWESSID]");
+		wpa_printf(MSG_ERROR, "ioctl[SIOCGIWESSID]");
 		ret = -1;
 	} else {
 		ret = iwr.u.essid.length;
@@ -205,7 +207,7 @@ int wpa_driver_wext_set_ssid(void *priv, const u8 *ssid, size_t ssid_len)
 	iwr.u.essid.length = ssid_len;
 
 	if (ioctl(drv->ioctl_sock, SIOCSIWESSID, &iwr) < 0) {
-		perror("ioctl[SIOCSIWESSID]");
+		wpa_printf(MSG_ERROR, "ioctl[SIOCSIWESSID]");
 		ret = -1;
 	}
 
@@ -231,7 +233,7 @@ int wpa_driver_wext_set_freq(void *priv, int freq)
 	iwr.u.freq.e = 1;
 
 	if (ioctl(drv->ioctl_sock, SIOCSIWFREQ, &iwr) < 0) {
-		perror("ioctl[SIOCSIWFREQ]");
+		wpa_printf(MSG_ERROR, "ioctl[SIOCSIWFREQ]");
 		ret = -1;
 	}
 
@@ -812,7 +814,7 @@ void * wpa_driver_wext_init(void *ctx, const char *ifname)
 
 	drv->ioctl_sock = socket(PF_INET, SOCK_DGRAM, 0);
 	if (drv->ioctl_sock < 0) {
-		perror("socket(PF_INET,SOCK_DGRAM)");
+		wpa_printf(MSG_ERROR, "socket(PF_INET,SOCK_DGRAM)");
 		goto err1;
 	}
 
@@ -1037,7 +1039,7 @@ int wpa_driver_wext_scan(void *priv, struct wpa_driver_scan_params *params)
 	}
 
 	if (ioctl(drv->ioctl_sock, SIOCSIWSCAN, &iwr) < 0) {
-		perror("ioctl[SIOCSIWSCAN]");
+		wpa_printf(MSG_ERROR, "ioctl[SIOCSIWSCAN]");
 		ret = -1;
 	}
 
@@ -1095,7 +1097,7 @@ static u8 * wpa_driver_wext_giwscan(struct wpa_driver_wext_data *drv,
 				   "trying larger buffer (%lu bytes)",
 				   (unsigned long) res_buf_len);
 		} else {
-			perror("ioctl[SIOCGIWSCAN]");
+			wpa_printf(MSG_ERROR, "ioctl[SIOCGIWSCAN]");
 			os_free(res_buf);
 			return NULL;
 		}
@@ -1547,7 +1549,7 @@ static int wpa_driver_wext_get_range(void *priv)
 		sizeof(range->enc_capa);
 
 	if (ioctl(drv->ioctl_sock, SIOCGIWRANGE, &iwr) < 0) {
-		perror("ioctl[SIOCGIWRANGE]");
+		wpa_printf(MSG_ERROR, "ioctl[SIOCGIWRANGE]");
 		os_free(range);
 		return -1;
 	} else if (iwr.u.data.length >= minlen &&
@@ -1579,7 +1581,11 @@ static int wpa_driver_wext_get_range(void *priv)
 			WPA_DRIVER_AUTH_SHARED |
 			WPA_DRIVER_AUTH_LEAP;
 #ifdef ANDROID
+		#ifdef NANO_SDIO_WIFI_USED		
+		drv->capa.max_scan_ssids = 1;
+		#else
 		drv->capa.max_scan_ssids = WEXT_CSCAN_AMOUNT;
+		#endif
 #else
 		drv->capa.max_scan_ssids = 1;
 #endif
@@ -1629,7 +1635,7 @@ static int wpa_driver_wext_set_psk(struct wpa_driver_wext_data *drv,
 
 	ret = ioctl(drv->ioctl_sock, SIOCSIWENCODEEXT, &iwr);
 	if (ret < 0)
-		perror("ioctl[SIOCSIWENCODEEXT] PMK");
+		wpa_printf(MSG_ERROR, "ioctl[SIOCSIWENCODEEXT] PMK");
 	os_free(ext);
 
 	return ret;
@@ -1721,7 +1727,7 @@ static int wpa_driver_wext_set_key_ext(void *priv, enum wpa_alg alg,
 			ret = -2;
 		}
 
-		perror("ioctl[SIOCSIWENCODEEXT]");
+		wpa_printf(MSG_ERROR, "ioctl[SIOCSIWENCODEEXT]");
 	}
 
 	os_free(ext);
@@ -1795,7 +1801,7 @@ int wpa_driver_wext_set_key(const char *ifname, void *priv, enum wpa_alg alg,
 	iwr.u.encoding.length = key_len;
 
 	if (ioctl(drv->ioctl_sock, SIOCSIWENCODE, &iwr) < 0) {
-		perror("ioctl[SIOCSIWENCODE]");
+		wpa_printf(MSG_ERROR, "ioctl[SIOCSIWENCODE]");
 		ret = -1;
 	}
 
@@ -1807,7 +1813,7 @@ int wpa_driver_wext_set_key(const char *ifname, void *priv, enum wpa_alg alg,
 		iwr.u.encoding.pointer = (caddr_t) NULL;
 		iwr.u.encoding.length = 0;
 		if (ioctl(drv->ioctl_sock, SIOCSIWENCODE, &iwr) < 0) {
-			perror("ioctl[SIOCSIWENCODE] (set_tx)");
+			wpa_printf(MSG_ERROR, "ioctl[SIOCSIWENCODE] (set_tx)");
 			ret = -1;
 		}
 	}
@@ -1856,7 +1862,7 @@ static int wpa_driver_wext_mlme(struct wpa_driver_wext_data *drv,
 	iwr.u.data.length = sizeof(mlme);
 
 	if (ioctl(drv->ioctl_sock, SIOCSIWMLME, &iwr) < 0) {
-		perror("ioctl[SIOCSIWMLME]");
+		wpa_printf(MSG_ERROR, "ioctl[SIOCSIWMLME]");
 		ret = -1;
 	}
 
@@ -1879,7 +1885,7 @@ static void wpa_driver_wext_disconnect(struct wpa_driver_wext_data *drv)
 	os_memset(&iwr, 0, sizeof(iwr));
 	os_strlcpy(iwr.ifr_name, drv->ifname, IFNAMSIZ);
 	if (ioctl(drv->ioctl_sock, SIOCGIWMODE, &iwr) < 0) {
-		perror("ioctl[SIOCGIWMODE]");
+		wpa_printf(MSG_ERROR, "ioctl[SIOCGIWMODE]");
 		iwr.u.mode = IW_MODE_INFRA;
 	}
 
@@ -1959,7 +1965,7 @@ static int wpa_driver_wext_set_gen_ie(void *priv, const u8 *ie,
 	iwr.u.data.length = ie_len;
 
 	if (ioctl(drv->ioctl_sock, SIOCSIWGENIE, &iwr) < 0) {
-		perror("ioctl[SIOCSIWGENIE]");
+		wpa_printf(MSG_ERROR, "ioctl[SIOCSIWGENIE]");
 		ret = -1;
 	}
 
@@ -2036,7 +2042,7 @@ wpa_driver_wext_auth_alg_fallback(struct wpa_driver_wext_data *drv,
 	}
 
 	if (ioctl(drv->ioctl_sock, SIOCSIWENCODE, &iwr) < 0) {
-		perror("ioctl[SIOCSIWENCODE]");
+		wpa_printf(MSG_ERROR, "ioctl[SIOCSIWENCODE]");
 		ret = -1;
 	}
 
@@ -2210,7 +2216,7 @@ int wpa_driver_wext_set_mode(void *priv, int mode)
 	}
 
 	if (errno != EBUSY) {
-		perror("ioctl[SIOCSIWMODE]");
+		wpa_printf(MSG_ERROR, "ioctl[SIOCSIWMODE]");
 		goto done;
 	}
 
@@ -2219,7 +2225,7 @@ int wpa_driver_wext_set_mode(void *priv, int mode)
 	 * down, try to set the mode again, and bring it back up.
 	 */
 	if (ioctl(drv->ioctl_sock, SIOCGIWMODE, &iwr) < 0) {
-		perror("ioctl[SIOCGIWMODE]");
+		wpa_printf(MSG_ERROR, "ioctl[SIOCGIWMODE]");
 		goto done;
 	}
 
@@ -2232,7 +2238,7 @@ int wpa_driver_wext_set_mode(void *priv, int mode)
 		/* Try to set the mode again while the interface is down */
 		iwr.u.mode = new_mode;
 		if (ioctl(drv->ioctl_sock, SIOCSIWMODE, &iwr) < 0)
-			perror("ioctl[SIOCSIWMODE]");
+			wpa_printf(MSG_ERROR, "ioctl[SIOCSIWMODE]");
 		else
 			ret = 0;
 
@@ -2265,7 +2271,7 @@ static int wpa_driver_wext_pmksa(struct wpa_driver_wext_data *drv,
 
 	if (ioctl(drv->ioctl_sock, SIOCSIWPMKSA, &iwr) < 0) {
 		if (errno != EOPNOTSUPP)
-			perror("ioctl[SIOCSIWPMKSA]");
+			wpa_printf(MSG_ERROR, "ioctl[SIOCSIWPMKSA]");
 		ret = -1;
 	}
 
@@ -2348,6 +2354,555 @@ static const char * wext_get_radio_name(void *priv)
 	struct wpa_driver_wext_data *drv = priv;
 	return drv->phyname;
 }
+
+#ifdef ANDROID
+/**
+ * wpa_driver_wext_set_scan_timeout - Set scan timeout to report scan completion
+ * @priv:  Pointer to private wext data from wpa_driver_wext_init()
+ *
+ * This function can be used to set registered timeout when starting a scan to
+ * generate a scan completed event if the driver does not report this.
+ */
+static void wpa_driver_wext_set_scan_timeout(void *priv)
+{
+	struct wpa_driver_wext_data *drv = priv;
+	int timeout = 10; /* In case scan A and B bands it can be long */
+
+	/* Not all drivers generate "scan completed" wireless event, so try to
+	 * read results after a timeout. */
+	if (drv->scan_complete_events) {
+	/*
+	 * The driver seems to deliver SIOCGIWSCAN events to notify
+	 * when scan is complete, so use longer timeout to avoid race
+	 * conditions with scanning and following association request.
+	 */
+		timeout = 30;
+	}
+	wpa_printf(MSG_DEBUG, "Scan requested - scan timeout %d seconds",
+		   timeout);
+	eloop_cancel_timeout(wpa_driver_wext_scan_timeout, drv, drv->ctx);
+	eloop_register_timeout(timeout, 0, wpa_driver_wext_scan_timeout, drv,
+			       drv->ctx);
+}
+
+/**
+ * wpa_driver_wext_combo_scan - Request the driver to initiate combo scan
+ * @priv: Pointer to private wext data from wpa_driver_wext_init()
+ * @params: Scan parameters
+ * Returns: 0 on success, -1 on failure
+ */
+int wpa_driver_wext_combo_scan(void *priv, struct wpa_driver_scan_params *params)
+{
+	char buf[WEXT_CSCAN_BUF_LEN];
+	struct wpa_driver_wext_data *drv = priv;
+	struct iwreq iwr;
+	int ret, bp;
+	unsigned i;
+	struct wpa_supplicant *wpa_s = (struct wpa_supplicant *)(drv->ctx);
+
+	if (!drv->driver_is_started) {
+		wpa_printf(MSG_DEBUG, "%s: Driver stopped", __func__);
+		return 0;
+	}
+
+	wpa_printf(MSG_DEBUG, "%s: Start", __func__);
+
+	/* Set list of SSIDs */
+	bp = WEXT_CSCAN_HEADER_SIZE;
+	os_memcpy(buf, WEXT_CSCAN_HEADER, bp);
+	for(i=0; i < params->num_ssids; i++) {
+		if ((bp + IW_ESSID_MAX_SIZE + 10) >= (int)sizeof(buf))
+			break;
+		wpa_printf(MSG_DEBUG, "For Scan: %s", params->ssids[i].ssid);
+		buf[bp++] = WEXT_CSCAN_SSID_SECTION;
+		buf[bp++] = params->ssids[i].ssid_len;
+		os_memcpy(&buf[bp], params->ssids[i].ssid, params->ssids[i].ssid_len);
+		bp += params->ssids[i].ssid_len;
+	}
+
+	/* Set list of channels */
+	buf[bp++] = WEXT_CSCAN_CHANNEL_SECTION;
+	buf[bp++] = 0;
+
+	/* Set passive dwell time (default is 250) */
+	buf[bp++] = WEXT_CSCAN_PASV_DWELL_SECTION;
+	buf[bp++] = (u8)WEXT_CSCAN_PASV_DWELL_TIME;
+	buf[bp++] = (u8)(WEXT_CSCAN_PASV_DWELL_TIME >> 8);
+
+	/* Set home dwell time (default is 40) */
+	buf[bp++] = WEXT_CSCAN_HOME_DWELL_SECTION;
+	buf[bp++] = (u8)WEXT_CSCAN_HOME_DWELL_TIME;
+	buf[bp++] = (u8)(WEXT_CSCAN_HOME_DWELL_TIME >> 8);
+
+	os_memset(&iwr, 0, sizeof(iwr));
+	os_strncpy(iwr.ifr_name, drv->ifname, IFNAMSIZ);
+	iwr.u.data.pointer = buf;
+	iwr.u.data.length = bp;
+
+	if ((ret = ioctl(drv->ioctl_sock, SIOCSIWPRIV, &iwr)) < 0) {
+		if (!drv->bgscan_enabled)
+			wpa_printf(MSG_ERROR, "ioctl[SIOCSIWPRIV] (cscan): %d", ret);
+		else
+			ret = 0;	/* Hide error in case of bg scan */
+	}
+	return ret;
+}
+
+static int wpa_driver_wext_set_cscan_params(char *buf, size_t buf_len, char *cmd)
+{
+	char *pasv_ptr;
+	int bp, i;
+	u16 pasv_dwell = WEXT_CSCAN_PASV_DWELL_TIME_DEF;
+	u8 channel;
+
+	wpa_printf(MSG_DEBUG, "%s: %s", __func__, cmd);
+
+	/* Get command parameters */
+	pasv_ptr = os_strstr(cmd, ",TIME=");
+	if (pasv_ptr) {
+		*pasv_ptr = '\0';
+		pasv_ptr += 6;
+		pasv_dwell = (u16)atoi(pasv_ptr);
+		if (pasv_dwell == 0)
+			pasv_dwell = WEXT_CSCAN_PASV_DWELL_TIME_DEF;
+	}
+	channel = (u8)atoi(cmd + 5);
+
+	bp = WEXT_CSCAN_HEADER_SIZE;
+	os_memcpy(buf, WEXT_CSCAN_HEADER, bp);
+
+	/* Set list of channels */
+	buf[bp++] = WEXT_CSCAN_CHANNEL_SECTION;
+	buf[bp++] = channel;
+	if (channel != 0) {
+		i = (pasv_dwell - 1) / WEXT_CSCAN_PASV_DWELL_TIME_DEF;
+		for (; i > 0; i--) {
+			if ((size_t)(bp + 12) >= buf_len)
+				break;
+			buf[bp++] = WEXT_CSCAN_CHANNEL_SECTION;
+			buf[bp++] = channel;
+		}
+	} else {
+		if (pasv_dwell > WEXT_CSCAN_PASV_DWELL_TIME_MAX)
+			pasv_dwell = WEXT_CSCAN_PASV_DWELL_TIME_MAX;
+	}
+
+	/* Set passive dwell time (default is 250) */
+	buf[bp++] = WEXT_CSCAN_PASV_DWELL_SECTION;
+	if (channel != 0) {
+		buf[bp++] = (u8)WEXT_CSCAN_PASV_DWELL_TIME_DEF;
+		buf[bp++] = (u8)(WEXT_CSCAN_PASV_DWELL_TIME_DEF >> 8);
+	} else {
+		buf[bp++] = (u8)pasv_dwell;
+		buf[bp++] = (u8)(pasv_dwell >> 8);
+	}
+
+	/* Set home dwell time (default is 40) */
+	buf[bp++] = WEXT_CSCAN_HOME_DWELL_SECTION;
+	buf[bp++] = (u8)WEXT_CSCAN_HOME_DWELL_TIME;
+	buf[bp++] = (u8)(WEXT_CSCAN_HOME_DWELL_TIME >> 8);
+
+	/* Set cscan type */
+	buf[bp++] = WEXT_CSCAN_TYPE_SECTION;
+	buf[bp++] = WEXT_CSCAN_TYPE_PASSIVE;
+	return bp;
+}
+
+static char *wpa_driver_get_country_code(int channels)
+{
+	char *country = "US"; /* WEXT_NUMBER_SCAN_CHANNELS_FCC */
+
+	if (channels == WEXT_NUMBER_SCAN_CHANNELS_ETSI)
+		country = "EU";
+	else if( channels == WEXT_NUMBER_SCAN_CHANNELS_MKK1)
+		country = "JP";
+	return country;
+}
+
+static int wpa_driver_set_backgroundscan_params(void *priv)
+{
+	struct wpa_driver_wext_data *drv = priv;
+	struct wpa_supplicant *wpa_s;
+	struct iwreq iwr;
+	int ret = 0, i = 0, bp;
+	char buf[WEXT_PNO_MAX_COMMAND_SIZE];
+	struct wpa_ssid *ssid_conf;
+
+	if (drv == NULL) {
+		wpa_printf(MSG_ERROR, "%s: drv is NULL. Exiting", __func__);
+		return -1;
+	}
+	if (drv->ctx == NULL) {
+		wpa_printf(MSG_ERROR, "%s: drv->ctx is NULL. Exiting", __func__);
+		return -1;
+	}
+	wpa_s = (struct wpa_supplicant *)(drv->ctx);
+	if (wpa_s->conf == NULL) {
+		wpa_printf(MSG_ERROR, "%s: wpa_s->conf is NULL. Exiting", __func__);
+		return -1;
+	}
+	ssid_conf = wpa_s->conf->ssid;
+
+	bp = WEXT_PNOSETUP_HEADER_SIZE;
+	os_memcpy(buf, WEXT_PNOSETUP_HEADER, bp);
+	buf[bp++] = WEXT_PNO_TLV_PREFIX;
+	buf[bp++] = WEXT_PNO_TLV_VERSION;
+	buf[bp++] = WEXT_PNO_TLV_SUBVERSION;
+	buf[bp++] = WEXT_PNO_TLV_RESERVED;
+
+	while ((i < WEXT_PNO_AMOUNT) && (ssid_conf != NULL)) {
+		/* Check that there is enough space needed for 1 more SSID, the other sections and null termination */
+		if ((bp + WEXT_PNO_SSID_HEADER_SIZE + IW_ESSID_MAX_SIZE + WEXT_PNO_NONSSID_SECTIONS_SIZE + 1) >= (int)sizeof(buf))
+			break;
+		if ((!ssid_conf->disabled) && (ssid_conf->ssid_len <= IW_ESSID_MAX_SIZE)){
+			wpa_printf(MSG_DEBUG, "For PNO Scan: %s", ssid_conf->ssid);
+			buf[bp++] = WEXT_PNO_SSID_SECTION;
+			buf[bp++] = ssid_conf->ssid_len;
+			os_memcpy(&buf[bp], ssid_conf->ssid, ssid_conf->ssid_len);
+			bp += ssid_conf->ssid_len;
+			i++;
+		}
+		ssid_conf = ssid_conf->next;
+	}
+
+	buf[bp++] = WEXT_PNO_SCAN_INTERVAL_SECTION;
+	os_snprintf(&buf[bp], WEXT_PNO_SCAN_INTERVAL_LENGTH + 1, "%x", WEXT_PNO_SCAN_INTERVAL);
+	bp += WEXT_PNO_SCAN_INTERVAL_LENGTH;
+
+	buf[bp++] = WEXT_PNO_REPEAT_SECTION;
+	os_snprintf(&buf[bp], WEXT_PNO_REPEAT_LENGTH + 1, "%x", WEXT_PNO_REPEAT);
+	bp += WEXT_PNO_REPEAT_LENGTH;
+
+	buf[bp++] = WEXT_PNO_MAX_REPEAT_SECTION;
+	os_snprintf(&buf[bp], WEXT_PNO_MAX_REPEAT_LENGTH + 1, "%x", WEXT_PNO_MAX_REPEAT);
+	bp += WEXT_PNO_MAX_REPEAT_LENGTH + 1;
+
+	os_memset(&iwr, 0, sizeof(iwr));
+	os_strncpy(iwr.ifr_name, drv->ifname, IFNAMSIZ);
+	iwr.u.data.pointer = buf;
+	iwr.u.data.length = bp;
+
+	ret = ioctl(drv->ioctl_sock, SIOCSIWPRIV, &iwr);
+
+	if (ret < 0) {
+		wpa_printf(MSG_ERROR, "ioctl[SIOCSIWPRIV] (pnosetup): %d", ret);
+		drv->errors++;
+		if (drv->errors > WEXT_NUMBER_SEQUENTIAL_ERRORS) {
+			drv->errors = 0;
+			wpa_msg(drv->ctx, MSG_INFO, WPA_EVENT_DRIVER_STATE "HANGED");
+		}
+	} else {
+		drv->errors = 0;
+	}
+	return ret;
+
+}
+
+
+#ifdef NANO_SDIO_WIFI_USED
+//copy from linux-c047.12 kernel/ic/nanoioctl.h, must be consistent with the source.
+// by wzh 2011-07-26
+
+#define NRXVOID         0U
+#define NRXIOC(I, G, N, L) (((I) << 30) | (((L) & 0x3fff) << 16) | ((G) << 8) | ((N) << 0))
+#define NRXIO(G, N)           NRXIOC(NRXVOID, (G), (N), 0)
+
+#define NRXIOCSHUTDOWN       NRXIO ('P', 39)
+#define NRXIOCPSENABLE       NRXIO ('P', 12)
+#define NRXIOCPSDISABLE      NRXIO ('P', 13)
+
+#define NRXIOCMAGIC     0x6e727800
+
+#define SIOCNRXRAWTX            (SIOCDEVPRIVATE)
+#define SIOCNRXRAWRX            (SIOCDEVPRIVATE + 1)
+#define SIOCNRXIOCTL            (SIOCDEVPRIVATE + 2)
+
+struct nrx_ioc {
+   unsigned int magic;      /* magic cookie NRXIOCMAGIC */
+   unsigned int cmd;           /* operation */
+};
+
+int wpa_driver_wext_driver_cmd( void *priv, char *cmd, char *buf, size_t buf_len )
+{
+	struct wpa_driver_wext_data *drv = priv;
+	int ret = 0, flags = 0;	
+
+	wpa_printf(MSG_DEBUG, "%s %s len = %d", __func__, cmd, buf_len);
+
+	if (!drv->driver_is_started && (os_strcasecmp(cmd, "START") != 0)) {
+		wpa_printf(MSG_ERROR,"WEXT: Driver not initialized yet");
+		return -1;
+	}	
+	
+	if (os_strcasecmp(cmd, "LINKSPEED") == 0) {
+		struct iwreq wrq;
+		unsigned int linkspeed;
+		os_strncpy(wrq.ifr_name, drv->ifname, IFNAMSIZ);
+		
+		if (ioctl(drv->ioctl_sock, SIOCGIWRATE, &wrq) < 0) {
+			wpa_printf(MSG_ERROR, "ioctl[SIOCGIWRATE]");
+			ret = -1;
+		} else {
+			linkspeed = wrq.u.bitrate.value / 1000000;
+			ret = snprintf(buf, buf_len, "LinkSpeed %d\n", linkspeed);
+			wpa_printf(MSG_DEBUG, "[REPLY]: %s", buf);
+		}
+	}	
+	else if (os_strncasecmp(cmd, "RSSI", 4) == 0) {
+		/* Matches both rssi and rssi-approx */
+		struct iwreq wrq;
+		struct iw_statistics stats;
+		signed int rssi;
+		u8 ssid[32] = {0};
+
+		wrq.u.data.pointer = (caddr_t) &stats;
+		wrq.u.data.length = sizeof(stats);
+		wrq.u.data.flags = 1; /* Clear updated flag */
+		strncpy(wrq.ifr_name, drv->ifname, IFNAMSIZ);
+
+		if (ioctl(drv->ioctl_sock, SIOCGIWSTATS, &wrq) < 0) {
+			wpa_printf(MSG_ERROR, "ioctl[SIOCGIWSTATS]");
+			ret = -1;
+		} else {
+			if (stats.qual.updated & IW_QUAL_DBM) {
+				/* Values in dBm, stored in u8 with range 63 : -192 */
+				rssi = ( stats.qual.level > 63 ) ?
+					stats.qual.level - 0x100 :
+					stats.qual.level;
+			} else {
+				rssi = stats.qual.level;
+			}		            
+			
+            flags = wpa_driver_wext_get_ssid(drv, ssid);
+		    if(-1 == flags) {
+                wpa_printf(MSG_ERROR, "rssi-get ssid error!");
+		        ret = snprintf(buf, buf_len,"null-ssid rssi %d\n", rssi);                
+		    }
+		    else {
+		        wpa_printf(MSG_DEBUG, "ssid: %s", ssid);
+		        ret = snprintf(buf, buf_len, "%s rssi %d\n", ssid, rssi);
+		    }		    			
+
+			wpa_printf(MSG_DEBUG, "[REPLY]: %s", buf);
+		}
+		
+	}
+	else if (os_strcasecmp(cmd, "MACADDR") == 0) {
+		struct ifreq ifr;
+		os_memset(&ifr, 0, sizeof(ifr));
+		os_strncpy(ifr.ifr_name, drv->ifname, IFNAMSIZ);
+
+		if (ioctl(drv->ioctl_sock, SIOCGIFHWADDR, &ifr) < 0) {
+			wpa_printf(MSG_ERROR, "ioctl[SIOCGIFHWADDR]");
+			ret = -1;
+		} else {
+			u8 *macaddr = (u8 *) ifr.ifr_hwaddr.sa_data;
+			ret = snprintf(buf, buf_len, "Macaddr = " MACSTR "\n", MAC2STR(macaddr));
+		}
+	}	
+	else if (os_strncasecmp(cmd, "POWERMODE", 9) == 0 ) {
+		int mode = atoi(cmd + 9);
+		struct nrx_ioc ioc;
+		struct ifreq ifr;
+		
+		wpa_printf(MSG_DEBUG,"POWERMODE %d", mode);
+		ioc.magic = NRXIOCMAGIC;
+		if(mode) {
+			ioc.cmd = NRXIOCPSENABLE;					
+		}else{			
+			ioc.cmd = NRXIOCPSDISABLE;			
+		}
+		ifr.ifr_data = (caddr_t)(&ioc);
+		os_strlcpy(ifr.ifr_name, drv->ifname, IFNAMSIZ);
+		/*
+	    if(ret = ioctl(drv->ioctl_sock, SIOCNRXIOCTL, &ifr) < 0) {
+		  wpa_printf(MSG_DEBUG, "nrx_disable_ps/nrx_enable_ps failed, exit code %d (%s)\n",
+			    ret, strerror(ret));			   
+		 return -1;
+	    }	*/				
+	}
+	else if (os_strcasecmp(cmd, "STOP") == 0) {	
+	    
+		wpa_printf(MSG_DEBUG,"Stop command");
+		linux_set_iface_flags(drv->ioctl_sock, drv->ifname, 0);
+
+	}
+	else if (os_strcasecmp(cmd, "START") == 0) {
+		
+		wpa_printf(MSG_DEBUG,"Start command");     	
+	    linux_set_iface_flags(drv->ioctl_sock, drv->ifname, 1);
+	}	
+	else if (os_strncasecmp(cmd, "SCAN-CHANNELS", 13) == 0) {
+		int no_of_chan;
+
+		no_of_chan = atoi(cmd + 13);
+		os_snprintf(cmd, MAX_DRV_CMD_SIZE, "COUNTRY %s",
+			wpa_driver_get_country_code(no_of_chan));	
+	}
+	else if (os_strncasecmp(cmd, "GETPOWER", 8) == 0) {
+	}
+	else if( os_strcasecmp(cmd, "RELOAD") == 0 ) {
+		wpa_printf(MSG_DEBUG,"Reload command");
+		wpa_msg(drv->ctx, MSG_INFO, WPA_EVENT_DRIVER_STATE "HANGED");
+		return ret;
+	}	
+	else {
+		wpa_printf(MSG_DEBUG,"Unsupported command");
+ 	}
+
+	if(ret < 0) {
+		wpa_printf(MSG_ERROR, "%s failed (%d): %s", __func__, ret, cmd);
+		drv->errors++;
+		if (drv->errors > WEXT_NUMBER_SEQUENTIAL_ERRORS) {
+			drv->errors = 0;
+			wpa_msg(drv->ctx, MSG_INFO, WPA_EVENT_DRIVER_STATE "HANGED");
+		}	
+	} 
+	else {
+		drv->errors = 0; 
+		ret = 0;		
+		if ((os_strncasecmp(cmd, "RSSI", 4) == 0) ||
+		    (os_strcasecmp(cmd, "LINKSPEED") == 0) ||
+		    (os_strcasecmp(cmd, "MACADDR") == 0) ||
+		    (os_strcasecmp(cmd, "GETPOWER") == 0) ||
+		    (os_strncasecmp(cmd, "POWERMODE", 9) == 0) ||
+		    (os_strcasecmp(cmd, "GETBAND") == 0)) {
+			ret = strlen(buf);
+		} else if (os_strcasecmp(cmd, "START") == 0) {
+			drv->driver_is_started = TRUE;
+			/* os_sleep(0, WPA_DRIVER_WEXT_WAIT_US);
+			wpa_msg(drv->ctx, MSG_INFO, WPA_EVENT_DRIVER_STATE "STARTED"); */
+			wpa_printf(MSG_DEBUG,"STARTTED TRUE");
+		} else if (os_strcasecmp(cmd, "STOP") == 0) {
+			drv->driver_is_started = FALSE;
+			wpa_printf(MSG_DEBUG,"STOPPED FALSE");
+			/* wpa_msg(drv->ctx, MSG_INFO, WPA_EVENT_DRIVER_STATE "STOPPED"); */
+		}
+		wpa_printf(MSG_DEBUG, "%s %s len = %d, %d", __func__, buf, ret, strlen(buf));
+	} 	
+ 	
+ 	return ret;
+}
+#else
+int wpa_driver_wext_driver_cmd( void *priv, char *cmd, char *buf, size_t buf_len )
+{
+	struct wpa_driver_wext_data *drv = priv;
+	struct wpa_supplicant *wpa_s = (struct wpa_supplicant *)(drv->ctx);
+	struct iwreq iwr;
+	int ret = 0, flags;
+
+	wpa_printf(MSG_DEBUG, "%s %s len = %d", __func__, cmd, buf_len);
+
+	if (!drv->driver_is_started && (os_strcasecmp(cmd, "START") != 0)) {
+		wpa_printf(MSG_ERROR,"WEXT: Driver not initialized yet");
+		return -1;
+	}
+
+	if (os_strcasecmp(cmd, "RSSI-APPROX") == 0) {
+		os_strncpy(cmd, RSSI_CMD, MAX_DRV_CMD_SIZE);
+	} else if( os_strncasecmp(cmd, "SCAN-CHANNELS", 13) == 0 ) {
+		int no_of_chan;
+
+		no_of_chan = atoi(cmd + 13);
+		os_snprintf(cmd, MAX_DRV_CMD_SIZE, "COUNTRY %s",
+			wpa_driver_get_country_code(no_of_chan));
+	} else if (os_strcasecmp(cmd, "STOP") == 0) {
+		linux_set_iface_flags(drv->ioctl_sock, drv->ifname, 0);
+	} else if( os_strcasecmp(cmd, "RELOAD") == 0 ) {
+		wpa_printf(MSG_DEBUG,"Reload command");
+		wpa_msg(drv->ctx, MSG_INFO, WPA_EVENT_DRIVER_STATE "HANGED");
+		return ret;
+	} else if( os_strcasecmp(cmd, "BGSCAN-START") == 0 ) {
+		ret = wpa_driver_set_backgroundscan_params(priv);
+		if (ret < 0) {
+			return ret;
+		}
+		os_strncpy(cmd, "PNOFORCE 1", MAX_DRV_CMD_SIZE);
+		drv->bgscan_enabled = 1;
+	} else if( os_strcasecmp(cmd, "BGSCAN-STOP") == 0 ) {
+		os_strncpy(cmd, "PNOFORCE 0", MAX_DRV_CMD_SIZE);
+		drv->bgscan_enabled = 0;
+	}
+
+	os_memset(&iwr, 0, sizeof(iwr));
+	os_strncpy(iwr.ifr_name, drv->ifname, IFNAMSIZ);
+	os_memcpy(buf, cmd, strlen(cmd) + 1);
+	iwr.u.data.pointer = buf;
+	iwr.u.data.length = buf_len;
+
+	if( os_strncasecmp(cmd, "CSCAN", 5) == 0 ) {
+		if (!wpa_s->scanning && ((wpa_s->wpa_state <= WPA_SCANNING) ||
+					(wpa_s->wpa_state >= WPA_COMPLETED))) {
+			iwr.u.data.length = wpa_driver_wext_set_cscan_params(buf, buf_len, cmd);
+		} else {
+			wpa_printf(MSG_ERROR, "Ongoing Scan action...");
+			return ret;
+		}
+	}
+
+	ret = ioctl(drv->ioctl_sock, SIOCSIWPRIV, &iwr);
+
+	if (ret < 0) {
+		wpa_printf(MSG_ERROR, "%s failed (%d): %s", __func__, ret, cmd);
+		drv->errors++;
+		if (drv->errors > WEXT_NUMBER_SEQUENTIAL_ERRORS) {
+			drv->errors = 0;
+			wpa_msg(drv->ctx, MSG_INFO, WPA_EVENT_DRIVER_STATE "HANGED");
+		}
+	} else {
+		drv->errors = 0;
+		ret = 0;
+		if ((os_strcasecmp(cmd, RSSI_CMD) == 0) ||
+		    (os_strcasecmp(cmd, LINKSPEED_CMD) == 0) ||
+		    (os_strcasecmp(cmd, "MACADDR") == 0) ||
+		    (os_strcasecmp(cmd, "GETPOWER") == 0) ||
+		    (os_strcasecmp(cmd, "GETBAND") == 0)) {
+			ret = strlen(buf);
+		} else if (os_strcasecmp(cmd, "START") == 0) {
+			drv->driver_is_started = TRUE;
+			linux_set_iface_flags(drv->ioctl_sock, drv->ifname, 1);
+			/* os_sleep(0, WPA_DRIVER_WEXT_WAIT_US);
+			wpa_msg(drv->ctx, MSG_INFO, WPA_EVENT_DRIVER_STATE "STARTED"); */
+		} else if (os_strcasecmp(cmd, "STOP") == 0) {
+			drv->driver_is_started = FALSE;
+			/* wpa_msg(drv->ctx, MSG_INFO, WPA_EVENT_DRIVER_STATE "STOPPED"); */
+		} else if (os_strncasecmp(cmd, "CSCAN", 5) == 0) {
+			wpa_driver_wext_set_scan_timeout(priv);
+			wpa_supplicant_notify_scanning(wpa_s, 1);
+		}
+		wpa_printf(MSG_DEBUG, "%s %s len = %d, %d", __func__, buf, ret, strlen(buf));
+	}
+	return ret;
+}
+#endif
+
+int wpa_driver_signal_poll(void *priv, struct wpa_signal_info *si)
+{
+	char buf[MAX_DRV_CMD_SIZE];
+	struct wpa_driver_wext_data *drv = priv;
+	char *prssi;
+	int res;
+
+	os_memset(si, 0, sizeof(*si));
+	res = wpa_driver_wext_driver_cmd(priv, RSSI_CMD, buf, sizeof(buf));
+	/* Answer: SSID rssi -Val */
+	if (res < 0)
+		return res;
+	prssi = strcasestr(buf, RSSI_CMD);
+	if (!prssi)
+		return -1;
+	si->current_signal = atoi(prssi + strlen(RSSI_CMD) + 1);
+
+	res = wpa_driver_wext_driver_cmd(priv, LINKSPEED_CMD, buf, sizeof(buf));
+	/* Answer: LinkSpeed Val */
+	if (res < 0)
+		return res;
+	si->current_txrate = atoi(buf + strlen(LINKSPEED_CMD) + 1) * 1000;
+
+	return 0;
+}
+
+#endif
 
 
 const struct wpa_driver_ops wpa_driver_wext_ops = {

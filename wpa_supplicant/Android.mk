@@ -31,6 +31,11 @@ include $(LOCAL_PATH)/.config
 # To ignore possible wrong network configurations
 L_CFLAGS = -DWPA_IGNORE_CONFIG_ERRORS
 
+# sw define: nano sdio wifi module
+ifeq ($(SW_BOARD_USR_WIFI), nanowifi)
+L_CFLAGS += -DNANO_SDIO_WIFI_USED
+endif
+
 # Set Android log name
 L_CFLAGS += -DANDROID_LOG_NAME=\"wpa_supplicant\"
 
