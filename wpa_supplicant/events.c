@@ -592,7 +592,11 @@ static struct wpa_ssid * wpa_scan_res_match(struct wpa_supplicant *wpa_s,
 			continue;
 		}
 
-		if (bss->caps & IEEE80211_CAP_IBSS) {
+		if ((bss->caps & IEEE80211_CAP_IBSS)
+#ifdef ANDROID_IBSS_HACK
+			&& (ssid->mode != WPAS_MODE_IBSS)
+#endif
+			) {
 			wpa_dbg(wpa_s, MSG_DEBUG, "   skip - IBSS (adhoc) "
 				"network");
 			continue;

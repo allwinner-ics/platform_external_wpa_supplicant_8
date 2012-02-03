@@ -47,4 +47,14 @@ int ibss_rsn_rx_eapol(struct ibss_rsn *ibss_rsn, const u8 *src_addr,
 		      const u8 *buf, size_t len);
 void ibss_rsn_set_psk(struct ibss_rsn *ibss_rsn, const u8 *psk);
 
+
+/// NOTE: don't confuse WifiStateMachine.parseScanResult
+#define ANDROID_IBSS_HACK
+
+#ifdef ANDROID_IBSS_HACK
+#define ANDROID_IBSS_PREFIX "(*)"
+#define ANDROID_IBSS_PREFIX_LEN 3
+#endif
+
+
 #endif /* IBSS_RSN_H */

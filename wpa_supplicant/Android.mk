@@ -36,6 +36,11 @@ ifeq ($(SW_BOARD_USR_WIFI), nanowifi)
 L_CFLAGS += -DNANO_SDIO_WIFI_USED
 endif
 
+# sw define: ralink usb wifi module
+ifeq ($(SW_BOARD_USR_WIFI), rt5370)
+L_CFLAGS += -DRAL_USB_WIFI_USED
+endif
+
 # Set Android log name
 L_CFLAGS += -DANDROID_LOG_NAME=\"wpa_supplicant\"
 

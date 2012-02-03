@@ -1581,7 +1581,7 @@ static int wpa_driver_wext_get_range(void *priv)
 			WPA_DRIVER_AUTH_SHARED |
 			WPA_DRIVER_AUTH_LEAP;
 #ifdef ANDROID
-		#ifdef NANO_SDIO_WIFI_USED		
+		#if (defined (NANO_SDIO_WIFI_USED) || defined (RAL_USB_WIFI_USED))
 		drv->capa.max_scan_ssids = 1;
 		#else
 		drv->capa.max_scan_ssids = WEXT_CSCAN_AMOUNT;
@@ -2599,6 +2599,8 @@ static int wpa_driver_set_backgroundscan_params(void *priv)
 }
 
 
+#if (defined (NANO_SDIO_WIFI_USED) || defined (RAL_USB_WIFI_USED))
+
 #ifdef NANO_SDIO_WIFI_USED
 //copy from linux-c047.12 kernel/ic/nanoioctl.h, must be consistent with the source.
 // by wzh 2011-07-26
@@ -2621,6 +2623,7 @@ struct nrx_ioc {
    unsigned int magic;      /* magic cookie NRXIOCMAGIC */
    unsigned int cmd;           /* operation */
 };
+#endif
 
 int wpa_driver_wext_driver_cmd( void *priv, char *cmd, char *buf, size_t buf_len )
 {
@@ -2702,6 +2705,7 @@ int wpa_driver_wext_driver_cmd( void *priv, char *cmd, char *buf, size_t buf_len
 	}	
 	else if (os_strncasecmp(cmd, "POWERMODE", 9) == 0 ) {
 		int mode = atoi(cmd + 9);
+#ifdef NANO_SDIO_WIFI_USED
 		struct nrx_ioc ioc;
 		struct ifreq ifr;
 		
@@ -2719,7 +2723,8 @@ int wpa_driver_wext_driver_cmd( void *priv, char *cmd, char *buf, size_t buf_len
 		  wpa_printf(MSG_DEBUG, "nrx_disable_ps/nrx_enable_ps failed, exit code %d (%s)\n",
 			    ret, strerror(ret));			   
 		 return -1;
-	    }	*/				
+	    }	*/
+#endif
 	}
 	else if (os_strcasecmp(cmd, "STOP") == 0) {	
 	    
