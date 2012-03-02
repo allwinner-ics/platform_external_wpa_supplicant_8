@@ -3144,6 +3144,9 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 	int ctrl_rsp = 0;
 	int reply_len;
 
+	if(os_strncmp(buf, "PING", 4) != 0)
+		wpa_printf(MSG_INFO, "[CTRL_IFACE]%s", buf);
+
 	if (os_strncmp(buf, WPA_CTRL_RSP, os_strlen(WPA_CTRL_RSP)) == 0 ||
 	    os_strncmp(buf, "SET_NETWORK ", 12) == 0) {
 		wpa_hexdump_ascii_key(MSG_DEBUG, "RX ctrl_iface",

@@ -2369,7 +2369,26 @@ static int wpas_get_noa(void *ctx, const u8 *interface_addr, u8 *buf,
 	return wpa_drv_get_noa(wpa_s, buf, buf_len);
 }
 
+#if defined(RTL_USB_WIFI_USED)
+static int wpas_go_connected(void *ctx, const u8 *dev_addr)
+{
+	struct wpa_supplicant *wpa_s = ctx;
 
+	for (wpa_s = wpa_s->global->ifaces; wpa_s; wpa_s = wpa_s->next) {
+		struct wpa_ssid *ssid = wpa_s->current_ssid;
+		if (ssid == NULL)
+			continue;
+		if (ssid->mode != WPAS_MODE_INFRA)
+			continue;
+		if (wpa_s->wpa_state != WPA_COMPLETED)
+			continue;
+		if (os_memcmp(wpa_s->go_dev_addr, dev_addr, ETH_ALEN) == 0)
+			return 1;
+	}
+
+	return 0;
+}
+#endif
 /**
  * wpas_p2p_init - Initialize P2P module for %wpa_supplicant
  * @global: Pointer to global data from wpa_supplicant_init()
@@ -2444,6 +2463,9 @@ int wpas_p2p_init(struct wpa_global *global, struct wpa_supplicant *wpa_s)
 	p2p.invitation_received = wpas_invitation_received;
 	p2p.invitation_result = wpas_invitation_result;
 	p2p.get_noa = wpas_get_noa;
+#if defined(RTL_USB_WIFI_USED)
+	p2p.go_connected = wpas_go_connected;
+#endif
 
 #ifdef ANDROID_BRCM_P2P_PATCH
 	/* P2P_ADDR: Using p2p_dev_addr to hold the actual p2p device address incase if

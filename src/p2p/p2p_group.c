@@ -693,3 +693,25 @@ const u8 * p2p_iterate_group_members(struct p2p_group *group, void **next)
 
 	return iter->addr;
 }
+#if defined(RTL_USB_WIFI_USED)
+int p2p_group_is_client_connected(struct p2p_group *group, const u8 *dev_addr)
+{
+	struct p2p_group_member *m;
+
+	wpa_printf(MSG_INFO, "%s group ssid:%s", __FUNCTION__
+		, group->p2p->ssid
+	);
+
+	for (m = group->members; m; m = m->next) {
+		
+		wpa_printf(MSG_INFO, "%s addr: " MACSTR " dev_addr:" MACSTR, __FUNCTION__
+			, MAC2STR(m->addr)
+			, MAC2STR(m->dev_addr)
+		);
+		if (os_memcmp(m->dev_addr, dev_addr, ETH_ALEN) == 0)
+			return 1;
+	}
+
+	return 0;
+}
+#endif

@@ -40,6 +40,11 @@
 #include "radiotap_iter.h"
 #include "rfkill.h"
 #include "driver.h"
+
+#if defined(RTL_USB_WIFI_USED)
+#define KERNEL_2_6_35_PATCH
+#endif
+
 #if defined(ANDROID_BRCM_P2P_PATCH) && !defined(HOSTAPD)
 #include "wpa_supplicant_i.h"
 #endif
@@ -1669,7 +1674,11 @@ static int wiphy_info_handler(struct nl_msg *msg, void *arg)
 		}
 	}
 
+#if defined(CONFIG_P2P) && defined(KERNEL_2_6_35_PATCH)
+	info->p2p_supported = 1;
+#else //defined(CONFIG_P2P) && defined(ANDROID_RTW_P2P_PATCH)
 	info->p2p_supported = p2p_go_supported && p2p_client_supported;
+#endif //defined(CONFIG_P2P) && defined(ANDROID_RTW_P2P_PATCH)
 
 	if (tb[NL80211_ATTR_SUPPORTED_COMMANDS]) {
 		struct nlattr *nl_cmd;
@@ -3764,8 +3773,12 @@ static int wpa_driver_nl80211_send_mlme(void *priv, const u8 *data,
 #ifdef ANDROID_BRCM_P2P_PATCH
 	if (drv->nlmode == NL80211_IFTYPE_AP) {
 		wpa_printf(MSG_DEBUG, "%s: Sending frame on ap_oper_freq %d using nl80211_send_frame_cmd", __func__, drv->ap_oper_freq);
+#if defined(CONFIG_P2P) && defined(KERNEL_2_6_35_PATCH)
+		return wpa_driver_nl80211_send_frame(drv, data, data_len, 0);
+#else
 		return nl80211_send_frame_cmd(drv, drv->ap_oper_freq, 0,
 					  data, data_len, &drv->send_action_cookie);
+#endif
 	}
 #else
 	if (drv->no_monitor_iface_capab && drv->nlmode == NL80211_IFTYPE_AP ) {
@@ -6386,6 +6399,11 @@ static int wpa_driver_nl80211_probe_req_report(void *priv, int report)
 	}
 #endif /* CONFIG_LIBNL20 */
 
+#if defined(CONFIG_P2P) && defined(KERNEL_2_6_35_PATCH)
+
+	//nothing to do now
+	
+#else //defined(CONFIG_P2P) && defined(KERNEL_2_6_35_PATCH)
 	if (nl80211_register_frame(drv, drv->nl_handle_preq,
 				   (WLAN_FC_TYPE_MGMT << 2) |
 				   (WLAN_FC_STYPE_PROBE_REQ << 4),
@@ -6431,7 +6449,9 @@ static int wpa_driver_nl80211_probe_req_report(void *priv, int report)
 	}
 
 done:
-#endif
+#endif //ANDROID_BRCM_P2P_PATCH
+#endif //defined(CONFIG_P2P) && defined(KERNEL_2_6_35_PATCH)
+
 	eloop_register_read_sock(nl_socket_get_fd(drv->nl_handle_preq),
 				 wpa_driver_nl80211_event_receive, drv,
 				 drv->nl_handle_preq);
