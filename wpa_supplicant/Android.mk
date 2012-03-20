@@ -46,6 +46,11 @@ ifeq ($(SW_BOARD_USR_WIFI), rtl8192cu)
 L_CFLAGS += -DRTL_USB_WIFI_USED
 endif
 
+# sw define: bcm40181 sdio wifi module
+ifeq ($(SW_BOARD_USR_WIFI), bcm40181)
+L_CFLAGS += -DBCM40181_SDIO_WIFI_USED
+endif
+
 # Set Android log name
 L_CFLAGS += -DANDROID_LOG_NAME=\"wpa_supplicant\"
 
