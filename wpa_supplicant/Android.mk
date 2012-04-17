@@ -48,7 +48,17 @@ endif
 
 # sw define: bcm40181 sdio wifi module
 ifeq ($(SW_BOARD_USR_WIFI), bcm40181)
-L_CFLAGS += -DBCM40181_SDIO_WIFI_USED
+L_CFLAGS += -DBCM4018X_SDIO_WIFI_USED
+endif
+
+# sw define: bcm40183 wifi+bt module
+ifeq ($(SW_BOARD_USR_WIFI), bcm40183)
+L_CFLAGS += -DBCM4018X_SDIO_WIFI_USED
+endif
+
+# sw define: realtek sdio wifi module,same with rtl8192cu
+ifeq ($(SW_BOARD_USR_WIFI), rtl8723as)
+L_CFLAGS += -DRTL_USB_WIFI_USED
 endif
 
 # Set Android log name

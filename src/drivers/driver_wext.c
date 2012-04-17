@@ -1581,7 +1581,7 @@ static int wpa_driver_wext_get_range(void *priv)
 			WPA_DRIVER_AUTH_SHARED |
 			WPA_DRIVER_AUTH_LEAP;
 #ifdef ANDROID
-		#if (defined (NANO_SDIO_WIFI_USED) || defined (RAL_USB_WIFI_USED) || defined(BCM40181_SDIO_WIFI_USED))
+		#if (defined(NANO_SDIO_WIFI_USED) || defined(RAL_USB_WIFI_USED) || defined(BCM4018X_SDIO_WIFI_USED))
 		drv->capa.max_scan_ssids = 1;
 		#else
 		drv->capa.max_scan_ssids = WEXT_CSCAN_AMOUNT;
@@ -2702,8 +2702,15 @@ int wpa_driver_wext_driver_cmd( void *priv, char *cmd, char *buf, size_t buf_len
 			u8 *macaddr = (u8 *) ifr.ifr_hwaddr.sa_data;
 			ret = snprintf(buf, buf_len, "Macaddr = " MACSTR "\n", MAC2STR(macaddr));
 		}
-	}	
-	else if (os_strncasecmp(cmd, "POWERMODE", 9) == 0 ) {
+	} else if (os_strcasecmp(cmd, "SCAN-PASSIVE") == 0) {
+		
+		ret = snprintf(buf, buf_len, "%s\n", "OK");
+		
+	} else if (os_strcasecmp(cmd, "SCAN-ACTIVE") == 0) {
+		
+		ret = snprintf(buf, buf_len, "%s\n", "OK");
+		
+	} else if (os_strncasecmp(cmd, "POWERMODE", 9) == 0 ) {
 		int mode = atoi(cmd + 9);
 #ifdef NANO_SDIO_WIFI_USED
 		struct nrx_ioc ioc;
@@ -2771,7 +2778,9 @@ int wpa_driver_wext_driver_cmd( void *priv, char *cmd, char *buf, size_t buf_len
 		    (os_strcasecmp(cmd, "MACADDR") == 0) ||
 		    (os_strcasecmp(cmd, "GETPOWER") == 0) ||
 		    (os_strncasecmp(cmd, "POWERMODE", 9) == 0) ||
-		    (os_strcasecmp(cmd, "GETBAND") == 0)) {
+		    (os_strcasecmp(cmd, "GETBAND") == 0) || 
+		    (os_strcasecmp(cmd, "SCAN-PASSIVE") == 0) || 
+		    (os_strcasecmp(cmd, "SCAN-ACTIVE") == 0) ) {
 			ret = strlen(buf);
 		} else if (os_strcasecmp(cmd, "START") == 0) {
 			drv->driver_is_started = TRUE;
